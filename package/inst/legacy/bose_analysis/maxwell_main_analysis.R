@@ -33,6 +33,13 @@ list_fitted <- lapply(list_df, function(df) {
 # Extract parameters
 params_fitted <- map_df(list_fitted, ~ coef(.x$optimized_params), .id = id)
 
+# two-element model is symmetric in (tau1, A1) <-> (tau2, A2); report the slower process as tau2
+if (model_type == "two") {
+  swap <- params_fitted$tau1 > params_fitted$tau2
+  params_fitted[swap, c("tau1", "tau2", "A1", "A2")] <-
+    params_fitted[swap, c("tau2", "tau1", "A2", "A1")]
+}
+
 # add total relaxation column to two element model
 if(model_type == "two") {
   params_fitted <- params_fitted %>%

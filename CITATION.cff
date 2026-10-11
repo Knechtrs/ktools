@@ -1,0 +1,14 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "ktools: Shared Laboratory Analysis and Plotting Helpers"
+type: software
+authors:
+  - family-names: Knecht
+    given-names: Raphael
+version: 0.1.1
+date-released: 2026-10-11
+license: MIT
+repository-code: "https://github.com/Knechtrs/ktools"
+abstract: >-
+  R helpers for summary tables, statistical annotations, plotting and themes,
+  including Maxwell-model fitting of stress-relaxation data.

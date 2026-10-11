@@ -1,6 +1,6 @@
 Package: ktools
 Title: Shared Laboratory Analysis and Plotting Helpers
-Version: 0.1.0
+Version: 0.1.1
 Authors@R: person("Raphael", "Knecht", email = "210419157+Knechtrs@users.noreply.github.com", role = c("aut", "cre"))
 Description: Versioned helpers for summary tables, statistical annotations,
     plotting and themes, with a snapshot of legacy analysis scripts.

@@ -1,5 +1,24 @@
 # R functions / ktools
 
+Shared R helpers for laboratory data analysis: summary tables, statistical
+annotations, plotting themes, and Maxwell-model fitting of stress-relaxation
+data (`R/bose_analysis/`). Released under the MIT license; see `LICENSE`.
+
+## Install
+
+```r
+# install.packages("remotes")
+remotes::install_github("Knechtrs/ktools", subdir = "package", ref = "v0.1.1")
+```
+
+Analysis scripts that are not exported as package functions ship with the
+package and can be sourced, for example
+`source(ktools::legacy_file("bose_analysis/maxwell_main_analysis.R"))`.
+
+## Citation
+
+Please cite the archived release; citation metadata is in `CITATION.cff`.
+
 Edit the canonical helper scripts under `R/`. Older projects may continue to
 source those files. New projects install `ktools` from `package/` and pin its
 version in their own `renv.lock`.
