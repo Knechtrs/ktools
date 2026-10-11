@@ -22,19 +22,79 @@ fun_plotting_Histogram <- function(
   # # Create explicit grouping variable that combines GroupVar with other factors
   has_group <- !rlang::quo_is_null(rlang::enquo(GroupVar))
   has_line  <- !rlang::quo_is_null(rlang::enquo(LineVar))
+  has_color <- !rlang::quo_is_null(rlang::enquo(ColorVar))
   
-  if (has_group && has_line) {
+  if (has_group && has_line && has_color) {
     data <- data %>%
-      dplyr::mutate(.group_var = interaction({{yvar1}}, {{ColorVar}}, {{GroupVar}}, {{LineVar}}, drop = TRUE))
+      dplyr::mutate(
+        .group_var = interaction(
+          {{yvar1}}, {{ColorVar}}, {{GroupVar}}, {{LineVar}},
+          drop = TRUE
+        )
+      )
+    
+  } else if (has_group && has_line) {
+    data <- data %>%
+      dplyr::mutate(
+        .group_var = interaction(
+          {{yvar1}}, {{GroupVar}}, {{LineVar}},
+          drop = TRUE
+        )
+      )
+    
+  } else if (has_group && has_color) {
+    data <- data %>%
+      dplyr::mutate(
+        .group_var = interaction(
+          {{yvar1}}, {{ColorVar}}, {{GroupVar}},
+          drop = TRUE
+        )
+      )
+    
+  } else if (has_line && has_color) {
+    data <- data %>%
+      dplyr::mutate(
+        .group_var = interaction(
+          {{yvar1}}, {{ColorVar}}, {{LineVar}},
+          drop = TRUE
+        )
+      )
+    
   } else if (has_group) {
     data <- data %>%
-      dplyr::mutate(.group_var = interaction({{yvar1}}, {{ColorVar}}, {{GroupVar}}, drop = TRUE))
+      dplyr::mutate(
+        .group_var = interaction(
+          {{yvar1}}, {{GroupVar}},
+          drop = TRUE
+        )
+      )
+    
   } else if (has_line) {
     data <- data %>%
-      dplyr::mutate(.group_var = interaction({{yvar1}}, {{ColorVar}}, {{LineVar}}, drop = TRUE))
+      dplyr::mutate(
+        .group_var = interaction(
+          {{yvar1}}, {{LineVar}},
+          drop = TRUE
+        )
+      )
+    
+  } else if (has_color) {
+    data <- data %>%
+      dplyr::mutate(
+        .group_var = interaction(
+          {{yvar1}}, {{ColorVar}},
+          drop = TRUE
+        )
+      )
+    
   } else {
     data <- data %>%
-      dplyr::mutate(.group_var = interaction({{yvar1}}, {{ColorVar}}, drop = TRUE))
+      dplyr::mutate(
+        .group_var = interaction(
+          {{yvar1}},
+          drop = TRUE
+        )
+      )
   }
   
   p <- ggplot(data, aes(

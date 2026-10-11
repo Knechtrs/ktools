@@ -15,7 +15,7 @@ version in their own `renv.lock`.
 
    ```sh
    R CMD build package --no-build-vignettes --no-manual
-   R CMD check ktools_0.1.0.tar.gz --no-manual
+   R CMD check ktools_*.tar.gz --no-manual
    ```
 
 The package includes common core, plotting, statistical annotation and theme
