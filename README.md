@@ -4,6 +4,14 @@ Edit the canonical helper scripts under `R/`. Older projects may continue to
 source those files. New projects install `ktools` from `package/` and pin its
 version in their own `renv.lock`.
 
+## Version used in the publication
+
+The analyses in Knecht et al. (Nature Communications) used **ktools v0.1.1**
+(https://doi.org/10.5281/zenodo.23302298). To reproduce them, install that
+version and cite that DOI. Later versions fix bugs that can change numbers. In
+particular, the package copies of the Maxwell fitting scripts and the paired
+effect-size CI in `add_stat_test_dodge()` changed in 0.1.2. See `NEWS.md`.
+
 ## Develop
 
 1. Edit the original scripts under `R/`.
