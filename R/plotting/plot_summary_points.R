@@ -108,7 +108,13 @@ plot_summary_points <- function(
   error_fun <- switch(
     error_type,
     se = mean_se,
-    sd = function(x) mean_sdl(x, mult = 1)
+    # mean ± 1 SD; computed directly because mean_sdl() needs Hmisc
+    sd = function(x) {
+      x <- x[!is.na(x)]
+      m <- mean(x)
+      s <- stats::sd(x)
+      data.frame(y = m, ymin = m - s, ymax = m + s)
+    }
   )
   
   if (show_stat_summary) {

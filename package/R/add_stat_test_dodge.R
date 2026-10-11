@@ -16,10 +16,10 @@ add_stat_test_dodge <- function(
     alternate = FALSE,             # TRUE to alternate p-values between two heights (needs adjust_y_position)
     pval_spacing = 0.05,           # vertical spacing between staggered/alternated p-values, as fraction of y-range
     expand_y_0 = TRUE,             # (currently unused) intended to control y-axis expansion at 0
-    lower_ylimit = 0,              # lower limit for the y-axis
+    lower_ylimit = 0,              # lower limit for the y-axis; NA = no limit (use for data that can be negative, e.g. log2 ratios)
     x_padding = NULL,              # extra horizontal padding added to the x-axis, if set
-    pval_gap = 1,                  # multiplier applied to auto-computed p-value y-position
-    expand_lower_y_mult = 0,       # y-axis expansion multiplier below lower_ylimit
+    pval_gap = 1,                  # multiplier for p-value distance above the data (1 = default distance)
+    expand_lower_y_mult = 0,       # y-axis expansion multiplier below lower_ylimit (use ~0.05 when lower_ylimit = NA)
     show_brackets = FALSE,         # TRUE to draw comparison brackets (line segments) above p-values
     bracket_dist = NULL,           # vertical spacing between stacked brackets; default 0.05 * facet y-range
     format_pvalue_dif = NULL,      # optional custom function(p) to format p-value labels
@@ -60,20 +60,12 @@ add_stat_test_dodge <- function(
   # Group and Dodge are the same variable
   if (!is.null(Dodge) && !is.null(Group) && Group == Dodge) {
     
-    df <- rename_Col(
-      df,
-      Name = Dodge,
-      NewName = "Dodge_col"
-    )
+    df <- rename_Col(df, Name = Dodge, NewName = "Dodge_col")
     
     df <- df %>%
       dplyr::mutate(Group_col = Dodge_col)
     
-    df <- rename_Col(
-      df,
-      Name = stat_group_by,
-      NewName = "stat_group_by"
-    )
+    df <- rename_Col(df, Name = stat_group_by, NewName = "stat_group_by")
     
   } else {
     
@@ -92,39 +84,48 @@ add_stat_test_dodge <- function(
   # the real (unfiltered) plot axis.
   
   if (!is.null(exclude_group)) {
-    
     df <- df %>%
-      dplyr::filter(
-        !Group_col %in% exclude_group
-      )
+      dplyr::filter(!Group_col %in% exclude_group)
   }
   
   
   # paired ID
   if (!is.null(id) && paired) {
-    df <- rename_Col(
-      df,
-      Name = id,
-      NewName = "ID_Col"
-    )
+    df <- rename_Col(df, Name = id, NewName = "ID_Col")
+  }
+  
+  
+  # ---- y-position helpers ----
+  #
+  # free_y = TRUE when no lower limit is set (lower_ylimit = NA), e.g. for
+  # log-scale data that can be negative. Then p-value positions are offset
+  # additively (fraction of the data range) instead of multiplicatively,
+  # because multiplying a negative maximum moves the label DOWN into the data.
+  # With lower_ylimit set (default 0) the original multiplicative behaviour
+  # is kept, so existing plots are unchanged.
+  
+  free_y <- is.na(lower_ylimit)
+  y_span <- diff(range(df$yData_col, na.rm = TRUE))
+  
+  pval_offset <- function(y, span = y_span) {
+    if (free_y) {
+      y + (pval_gap * 1.05 - 1) * span     # pval_gap = 1 -> 5% of range above max
+    } else {
+      y * pval_gap * 1.05
+    }
   }
   
   
   # ---- statistical test ----
   
-  formula <- stats::as.formula(
-    "yData_col ~ Group_col"
-  )
-  
+  formula <- stats::as.formula("yData_col ~ Group_col")
   
   test_fun <- switch(
     test,
     "t.test" = rstatix::t_test,
     "wilcox.test" = rstatix::wilcox_test,
     "permutation" = perm_test_fun,
-    stop(
-      "Invalid test specified. Use 't.test', 'wilcox.test', or 'permutation'."
-    )
+    stop("Invalid test specified. Use 't.test', 'wilcox.test', or 'permutation'.")
   )
   
   
@@ -133,39 +134,20 @@ add_stat_test_dodge <- function(
   group_vars <- character()
   
   if (!is.null(Facet)) {
-    group_vars <- c(
-      group_vars,
-      "Facet_col"
-    )
+    group_vars <- c(group_vars, "Facet_col")
   }
   
   if (!is.null(stat_group_by)) {
     
-    group_vars <- c(
-      group_vars,
-      "stat_group_by"
-    )
+    group_vars <- c(group_vars, "stat_group_by")
     
-  } else if (
-    !is.null(Dodge) &&
-    !is.null(Group) &&
-    Group != Dodge
-  ) {
+  } else if (!is.null(Dodge) && !is.null(Group) && Group != Dodge) {
     
-    group_vars <- c(
-      group_vars,
-      "Dodge_col"
-    )
+    group_vars <- c(group_vars, "Dodge_col")
     
-  } else if (
-    !is.null(Dodge) &&
-    is.null(Group)
-  ) {
+  } else if (!is.null(Dodge) && is.null(Group)) {
     
-    group_vars <- c(
-      group_vars,
-      "Dodge_col"
-    )
+    group_vars <- c(group_vars, "Dodge_col")
   }
   
   
@@ -174,70 +156,39 @@ add_stat_test_dodge <- function(
   if (!is.null(Group) && is.null(Dodge)) {
     
     tmp <- df %>%
-      dplyr::group_by(
-        dplyr::across(
-          dplyr::all_of(group_vars)
-        ),
-        Group_col
-      ) %>%
-      dplyr::summarise(
-        n = dplyr::n(),
-        .groups = "drop"
-      )
+      dplyr::group_by(dplyr::across(dplyr::all_of(group_vars)), Group_col) %>%
+      dplyr::summarise(n = dplyr::n(), .groups = "drop")
     
   } else {
     
     tmp <- df %>%
-      dplyr::group_by(
-        dplyr::across(
-          dplyr::all_of(group_vars)
-        )
-      ) %>%
-      dplyr::summarise(
-        n = dplyr::n(),
-        .groups = "drop"
-      )
+      dplyr::group_by(dplyr::across(dplyr::all_of(group_vars))) %>%
+      dplyr::summarise(n = dplyr::n(), .groups = "drop")
   }
-  
   
   low_n <- tmp %>%
     dplyr::filter(n <= 2)
-  
   
   if (nrow(low_n) > 0) {
     
     message(
       "Groups with n <= 2 were removed: ",
-      paste(
-        apply(
-          low_n,
-          1,
-          paste,
-          collapse = " "
-        ),
-        collapse = "; "
-      )
+      paste(apply(low_n, 1, paste, collapse = " "), collapse = "; ")
     )
-    
     
     if (!is.null(Group) && is.null(Dodge)) {
       
       df <- df %>%
         dplyr::inner_join(
-          tmp %>%
-            dplyr::filter(n > 2),
-          by = c(
-            group_vars,
-            "Group_col"
-          )
+          tmp %>% dplyr::filter(n > 2),
+          by = c(group_vars, "Group_col")
         )
       
     } else {
       
       df <- df %>%
         dplyr::inner_join(
-          tmp %>%
-            dplyr::filter(n > 2),
+          tmp %>% dplyr::filter(n > 2),
           by = group_vars
         )
     }
@@ -249,27 +200,13 @@ add_stat_test_dodge <- function(
   if (paired && !is.null(id)) {
     
     df <- df %>%
-      dplyr::group_by(
-        dplyr::across(
-          dplyr::all_of(
-            c(
-              group_vars,
-              "ID_Col"
-            )
-          )
-        )
-      ) %>%
-      dplyr::filter(
-        dplyr::n_distinct(Group_col) == 2
-      ) %>%
+      dplyr::group_by(dplyr::across(dplyr::all_of(c(group_vars, "ID_Col")))) %>%
+      dplyr::filter(dplyr::n_distinct(Group_col) == 2) %>%
       dplyr::ungroup()
-    
     
     df <- df %>%
       dplyr::arrange(
-        dplyr::across(
-          dplyr::all_of(group_vars)
-        ),
+        dplyr::across(dplyr::all_of(group_vars)),
         ID_Col,
         Group_col
       )
@@ -281,25 +218,12 @@ add_stat_test_dodge <- function(
   if (length(group_vars) > 0) {
     
     stat.test <- df %>%
-      dplyr::group_by(
-        dplyr::across(
-          dplyr::all_of(group_vars)
-        )
-      ) %>%
-      test_fun(
-        formula,
-        paired = paired,
-        ref.group = ref_group
-      )
+      dplyr::group_by(dplyr::across(dplyr::all_of(group_vars))) %>%
+      test_fun(formula, paired = paired, ref.group = ref_group)
     
   } else {
     
-    stat.test <- test_fun(
-      df,
-      formula,
-      paired = paired,
-      ref.group = ref_group
-    )
+    stat.test <- test_fun(df, formula, paired = paired, ref.group = ref_group)
   }
   
   
@@ -326,49 +250,37 @@ add_stat_test_dodge <- function(
     )
     
     stat.test <- stat.test %>%
-      dplyr::filter(
-        comp_key(group1, group2) %in% wanted_keys
-      )
+      dplyr::filter(comp_key(group1, group2) %in% wanted_keys)
   }
   
   
   # ---- significance + xy position ----
   
-  if (
-    !is.null(stat_group_by) &&
-    test != "permutation"
-  ) {
+  dodge_w_default <- if (!is.null(dodge_width)) {
+    dodge_width
+  } else {
+    plot$layers[[1]]$position$width
+  }
+  
+  format_p <- function(p) {
+    if (!is.null(format_pvalue_dif)) format_pvalue_dif(p) else format_pvalue(p)
+  }
+  
+  if (!is.null(stat_group_by) && test != "permutation") {
     
     stat.test <- stat.test %>%
       rstatix::add_significance() %>%
       rstatix::add_xy_position(
         x = "stat_group_by",
         fun = "max",
-        dodge = if (!is.null(dodge_width)) {
-          dodge_width
-        } else {
-          plot$layers[[2]]$position$width
-        }
+        dodge = dodge_w_default
       ) %>%
       dplyr::mutate(
-        yMax = if (!is.null(yPosition)) {
-          yPosition
-        } else {
-          y.position * pval_gap * 1.05
-        },
-        
-        p_formatted = if (!is.null(format_pvalue_dif)) {
-          format_pvalue_dif(p)
-        } else {
-          format_pvalue(p)
-        }
+        yMax = if (!is.null(yPosition)) yPosition else pval_offset(y.position),
+        p_formatted = format_p(p)
       )
     
-    
-  } else if (
-    test != "permutation" &&
-    !is.null(Dodge)
-  ) {
+  } else if (test != "permutation" && !is.null(Dodge)) {
     
     stat.test <- stat.test %>%
       rstatix::add_significance() %>%
@@ -376,49 +288,21 @@ add_stat_test_dodge <- function(
         x = "Group_col",
         fun = "max",
         group = "Dodge_col",
-        dodge = if (!is.null(dodge_width)) {
-          dodge_width
-        } else {
-          plot$layers[[2]]$position$width
-        }
+        dodge = dodge_w_default
       ) %>%
       dplyr::mutate(
-        yMax = if (!is.null(yPosition)) {
-          yPosition
-        } else {
-          y.position * pval_gap * 1.05
-        },
-        
-        p_formatted = if (!is.null(format_pvalue_dif)) {
-          format_pvalue_dif(p)
-        } else {
-          format_pvalue(p)
-        }
+        yMax = if (!is.null(yPosition)) yPosition else pval_offset(y.position),
+        p_formatted = format_p(p)
       )
     
-    
-  } else if (
-    test != "permutation" &&
-    is.null(Dodge)
-  ) {
+  } else if (test != "permutation" && is.null(Dodge)) {
     
     stat.test <- stat.test %>%
       rstatix::add_significance() %>%
-      rstatix::add_xy_position(
-        fun = "max"
-      ) %>%
+      rstatix::add_xy_position(fun = "max") %>%
       dplyr::mutate(
-        yMax = if (!is.null(yPosition)) {
-          yPosition
-        } else {
-          y.position * pval_gap * 1.05
-        },
-        
-        p_formatted = if (!is.null(format_pvalue_dif)) {
-          format_pvalue_dif(p)
-        } else {
-          format_pvalue(p)
-        }
+        yMax = if (!is.null(yPosition)) yPosition else pval_offset(y.position),
+        p_formatted = format_p(p)
       )
   }
   
@@ -431,396 +315,221 @@ add_stat_test_dodge <- function(
       dplyr::mutate(
         xmin = 1,
         xmax = 2,
-        yMax = purrr::map_dbl(
-          data,
-          ~ max(
-            .x$yData_col,
-            na.rm = TRUE
-          )
-        ) * 1.1,
-        
-        p_formatted = if (!is.null(format_pvalue_dif)) {
-          format_pvalue_dif(p)
-        } else {
-          format_pvalue(p)
-        }
+        yMax = purrr::map_dbl(data, ~ {
+          m <- max(.x$yData_col, na.rm = TRUE)
+          if (free_y) m + 0.1 * y_span else m * 1.1
+        }),
+        p_formatted = format_p(p)
       ) %>%
-      dplyr::rename(
-        data_nested = data
-      )
-    
+      dplyr::rename(data_nested = data)
     
     if (is.null(Dodge)) {
       
-      x_levels <- levels(
-        factor(
-          plot$data[[Group]]
-        )
-      )
+      x_levels <- levels(factor(plot$data[[Group]]))
       
       stat.test <- stat.test %>%
         dplyr::mutate(
-          xmin = match(
-            group1,
-            x_levels
-          ),
-          xmax = match(
-            group2,
-            x_levels
-          )
+          xmin = match(group1, x_levels),
+          xmax = match(group2, x_levels)
         )
     }
     
-    
-    if (
-      !is.null(Dodge) &&
-      !is.null(stat_group_by)
-    ) {
-      
-      dodge_w <- if (!is.null(dodge_width)) {
-        dodge_width
-      } else {
-        plot$layers[[2]]$position$width
-      }
+    if (!is.null(Dodge) && !is.null(stat_group_by)) {
       
       stat.test <- stat.test %>%
         dplyr::mutate(
-          dodge_numeric = as.numeric(
-            as.factor(
-              stat_group_by
-            )
-          ),
-          xmin = dodge_numeric - dodge_w / 2,
-          xmax = dodge_numeric + dodge_w / 2
+          dodge_numeric = as.numeric(as.factor(stat_group_by)),
+          xmin = dodge_numeric - dodge_w_default / 2,
+          xmax = dodge_numeric + dodge_w_default / 2
         ) %>%
-        dplyr::select(
-          -dodge_numeric
-        )
+        dplyr::select(-dodge_numeric)
     }
   }
   
   
   # ---- effect size ----
+  #
+  # Paired t-tests: bias-corrected d_z with exact CI from the noncentral t
+  # distribution, so that CI excludes 0 <=> p < 0.05.
+  # Other cases: effectsize package as before.
   
-  if (
-    show_effectsize &&
-    test != "permutation"
-  ) {
+  if (show_effectsize && test != "permutation") {
     
-    if (effectsize_type == "d") {
+    if (!effectsize_type %in% c("d", "g")) {
+      stop("effectsize_type must be 'd' (Cohen's d) or 'g' (Hedges' g).")
+    }
+    set_adjust <- effectsize_type == "g"
+    
+    if (paired && test == "t.test") {
       
-      set_adjust <- FALSE
+      nct_ci_dz <- function(t, df, n, level = 0.95) {
+        a <- (1 - level) / 2
+        f <- function(ncp, target) suppressWarnings(stats::pt(t, df, ncp)) - target
+        w <- 10 * max(1, abs(t))
+        lo <- stats::uniroot(f, c(t - w, t + w), target = 1 - a)$root
+        hi <- stats::uniroot(f, c(t - w, t + w), target = a)$root
+        J  <- if (set_adjust) 1 - 3 / (4 * df - 1) else 1
+        c(d = J * t / sqrt(n), lo = J * lo / sqrt(n), hi = J * hi / sqrt(n))
+      }
       
-    } else if (effectsize_type == "g") {
-      
-      set_adjust <- TRUE
+      stat.test <- stat.test %>%
+        dplyr::mutate(
+          es      = purrr::pmap(list(statistic, df, n1), nct_ci_dz),
+          d       = purrr::map_dbl(es, "d"),
+          CI      = 0.95,
+          CI_low  = purrr::map_dbl(es, "lo"),
+          CI_high = purrr::map_dbl(es, "hi")
+        ) %>%
+        dplyr::select(-es)
       
     } else {
       
-      stop(
-        "effectsize_type must be 'd' (Cohen's d) or 'g' (Hedges' g)."
-      )
-    }
-    
-    
-    effectsize_tbl <- df %>%
-      dplyr::group_by(
-        dplyr::across(
-          dplyr::all_of(group_vars)
-        )
-      ) %>%
-      dplyr::group_modify(
-        ~ {
-          
-          if (paired) {
-            
-            effectsize::repeated_measures_d(
-              yData_col ~ Group_col | ID_Col,
-              data = .x,
-              ci = 0.95,
-              method = method_sd,
-              adjust = set_adjust
-            )
-            
-          } else if (
-            effectsize_type == "d"
-          ) {
-            
-            effectsize::cohens_d(
-              yData_col ~ Group_col,
-              data = .x,
-              ci = 0.95,
-              hedges.correction = FALSE
-            )
-            
-          } else {
-            
-            effectsize::hedges_g(
-              yData_col ~ Group_col,
-              data = .x,
-              ci = 0.95
-            )
+      effectsize_tbl <- df %>%
+        dplyr::group_by(dplyr::across(dplyr::all_of(group_vars))) %>%
+        dplyr::group_modify(
+          ~ {
+            if (paired) {
+              effectsize::repeated_measures_d(
+                yData_col ~ Group_col | ID_Col,
+                data = .x, ci = 0.95,
+                method = method_sd, adjust = set_adjust
+              )
+            } else if (effectsize_type == "d") {
+              effectsize::cohens_d(
+                yData_col ~ Group_col,
+                data = .x, ci = 0.95, hedges.correction = FALSE
+              )
+            } else {
+              effectsize::hedges_g(yData_col ~ Group_col, data = .x, ci = 0.95)
+            }
           }
-        }
-      ) %>%
-      dplyr::ungroup()
-    
-    
-    stat.test <- stat.test %>%
-      dplyr::left_join(
-        effectsize_tbl,
-        by = group_vars
-      )
+        ) %>%
+        dplyr::ungroup()
+      
+      stat.test <- stat.test %>%
+        dplyr::left_join(effectsize_tbl, by = group_vars)
+    }
   }
   
   
   # ---- calculate base y position per facet ----
   #
-  # IMPORTANT:
-  # This now happens BEFORE staggering.
+  # IMPORTANT: this happens BEFORE staggering.
   
-  if (
-    !is.null(Facet) &&
-    test != "permutation"
-  ) {
+  if (!is.null(Facet) && test != "permutation") {
     
-    if (!is.null(stat_group_by)) {
-      
-      y_max_per_facet <- df %>%
-        dplyr::group_by(
-          Facet_col,
-          stat_group_by
-        ) %>%
-        dplyr::summarise(
-          y_max = max(
-            yData_col,
-            na.rm = TRUE
-          ),
-          .groups = "drop"
-        )
-      
-      
-      stat.test <- stat.test %>%
-        dplyr::left_join(
-          y_max_per_facet,
-          by = c(
-            "Facet_col",
-            "stat_group_by"
-          )
-        ) %>%
-        dplyr::mutate(
-          yMax = if (!is.null(yPosition)) {
-            yPosition
-          } else {
-            y_max * pval_gap * 1.05
-          }
-        ) %>%
-        dplyr::select(
-          -y_max
-        )
-      
+    facet_group_vars <- if (!is.null(stat_group_by)) {
+      c("Facet_col", "stat_group_by")
     } else {
-      
-      y_max_per_facet <- df %>%
-        dplyr::group_by(
-          Facet_col
-        ) %>%
-        dplyr::summarise(
-          y_max = max(
-            yData_col,
-            na.rm = TRUE
-          ),
-          .groups = "drop"
-        )
-      
-      
-      stat.test <- stat.test %>%
-        dplyr::left_join(
-          y_max_per_facet,
-          by = "Facet_col"
-        ) %>%
-        dplyr::mutate(
-          yMax = if (!is.null(yPosition)) {
-            yPosition
-          } else {
-            y_max * pval_gap * 1.05
-          }
-        ) %>%
-        dplyr::select(
-          -y_max
-        )
+      "Facet_col"
     }
+    
+    y_max_per_facet <- df %>%
+      dplyr::group_by(dplyr::across(dplyr::all_of(facet_group_vars))) %>%
+      dplyr::summarise(
+        y_max    = max(yData_col, na.rm = TRUE),
+        .groups = "drop"
+      )
+    
+    # data range per facet (for the additive offset when free_y)
+    y_span_per_facet <- df %>%
+      dplyr::group_by(Facet_col) %>%
+      dplyr::summarise(
+        y_span_f = diff(range(yData_col, na.rm = TRUE)),
+        .groups = "drop"
+      )
+    
+    stat.test <- stat.test %>%
+      dplyr::left_join(y_max_per_facet, by = facet_group_vars) %>%
+      dplyr::left_join(y_span_per_facet, by = "Facet_col") %>%
+      dplyr::mutate(
+        yMax = if (!is.null(yPosition)) yPosition else pval_offset(y_max, y_span_f)
+      ) %>%
+      dplyr::select(-y_max, -y_span_f)
   }
   
   
   # ---- adjust / stagger p-value positions ----
   #
-  # FIX:
   # 1. Runs AFTER facet-specific y positions are calculated
   # 2. Uses xmin/xmax instead of nonexistent `x`
   # 3. Uses a separate spacing range per facet/group
   
-  if (
-    adjust_y_position &&
-    nrow(stat.test) > 1
-  ) {
+  if (adjust_y_position && nrow(stat.test) > 1) {
     
-    if (
-      staggered &&
-      alternate
-    ) {
-      
-      stop(
-        "Set only one of `staggered` or `alternate` to TRUE."
+    if (staggered && alternate) {
+      stop("Set only one of `staggered` or `alternate` to TRUE.")
+    }
+    
+    # Space labels across the whole panel (per facet), not within each
+    # stat_group_by unit — otherwise each unit has a single row and the
+    # offset is always 0.
+    spacing_vars <- if (!is.null(Facet)) "Facet_col" else character()
+    
+    y_range_lookup <- df %>%
+      dplyr::group_by(dplyr::across(dplyr::all_of(spacing_vars))) %>%
+      dplyr::summarise(
+        .y_range = if (free_y) {
+          diff(range(yData_col, na.rm = TRUE))
+        } else {
+          max(yData_col, na.rm = TRUE) - lower_ylimit
+        },
+        .groups = "drop"
       )
-    }
     
-    
-    # calculate local y-range for each statistical grouping unit
-    if (length(group_vars) > 0) {
-      
-      y_range_lookup <- df %>%
-        dplyr::group_by(
-          dplyr::across(
-            dplyr::all_of(group_vars)
-          )
-        ) %>%
-        dplyr::summarise(
-          .y_range = max(
-            yData_col,
-            na.rm = TRUE
-          ) - lower_ylimit,
-          .groups = "drop"
-        )
-      
-      
-      stat.test <- stat.test %>%
-        dplyr::left_join(
-          y_range_lookup,
-          by = group_vars
-        ) %>%
-        dplyr::group_by(
-          dplyr::across(
-            dplyr::all_of(group_vars)
-          )
-        )
-      
+    if (length(spacing_vars) > 0) {
+      stat.test <- dplyr::left_join(stat.test, y_range_lookup, by = spacing_vars)
     } else {
-      
-      stat.test <- stat.test %>%
-        dplyr::mutate(
-          .y_range = max(
-            df$yData_col,
-            na.rm = TRUE
-          ) - lower_ylimit
-        )
+      stat.test$.y_range <- y_range_lookup$.y_range
     }
     
+    stat.test <- stat.test %>%
+      dplyr::group_by(dplyr::across(dplyr::all_of(spacing_vars))) %>%
+      dplyr::arrange(xmin, xmax, .by_group = TRUE)
     
     if (alternate) {
-      
       stat.test <- stat.test %>%
-        dplyr::arrange(
-          xmin,
-          xmax,
-          .by_group = TRUE
-        ) %>%
         dplyr::mutate(
-          yMax = max(
-            yMax,
-            na.rm = TRUE
-          ) +
-            (
-              (dplyr::row_number() - 1) %% 2
-            ) *
-            pval_spacing *
-            .y_range
+          yMax = max(yMax, na.rm = TRUE) +
+            ((dplyr::row_number() - 1) %% 2) * pval_spacing * .y_range
         )
-      
-      
     } else if (staggered) {
-      
       stat.test <- stat.test %>%
-        dplyr::arrange(
-          xmin,
-          xmax,
-          .by_group = TRUE
-        ) %>%
         dplyr::mutate(
-          yMax = max(
-            yMax,
-            na.rm = TRUE
-          ) +
-            (
-              dplyr::row_number() - 1
-            ) *
-            pval_spacing *
-            .y_range
+          yMax = max(yMax, na.rm = TRUE) +
+            (dplyr::row_number() - 1) * pval_spacing * .y_range
         )
-      
-      
     } else {
-      
       stat.test <- stat.test %>%
         dplyr::mutate(
-          yMax = min(
-            yMax,
-            na.rm = TRUE
-          ) +
-            (
-              rank(
-                yMax,
-                ties.method = "first"
-              ) - 1
-            ) *
-            pval_spacing *
-            .y_range
+          yMax = min(yMax, na.rm = TRUE) +
+            (rank(yMax, ties.method = "first") - 1) * pval_spacing * .y_range
         )
     }
-    
     
     stat.test <- stat.test %>%
       dplyr::ungroup() %>%
-      dplyr::select(
-        -.y_range
-      )
+      dplyr::select(-.y_range)
   }
   
   
   # ---- top align ----
   
-  if (
-    top_align &&
-    nrow(stat.test) > 0
-  ) {
+  if (top_align && nrow(stat.test) > 0) {
     
     if (length(group_vars) > 0) {
       
       stat.test <- stat.test %>%
-        dplyr::group_by(
-          dplyr::across(
-            dplyr::all_of(group_vars)
-          )
-        ) %>%
-        dplyr::mutate(
-          yMax = max(
-            yMax,
-            na.rm = TRUE
-          )
-        ) %>%
+        dplyr::group_by(dplyr::across(dplyr::all_of(group_vars))) %>%
+        dplyr::mutate(yMax = max(yMax, na.rm = TRUE)) %>%
         dplyr::ungroup()
       
     } else {
       
-      top_val <- max(
-        stat.test$yMax,
-        na.rm = TRUE
-      )
+      top_val <- max(stat.test$yMax, na.rm = TRUE)
       
       stat.test <- stat.test %>%
-        dplyr::mutate(
-          yMax = top_val
-        )
+        dplyr::mutate(yMax = top_val)
     }
   }
   
@@ -831,81 +540,50 @@ add_stat_test_dodge <- function(
     
     yMax_lookup <- stat.test %>%
       dplyr::reframe(
-        yMax_bigger = max(
-          yMax,
-          na.rm = TRUE
-        ),
+        yMax_bigger = max(yMax, na.rm = TRUE),
         .by = "Facet_col"
       )
     
-    
     stat.test <- stat.test %>%
-      dplyr::left_join(
-        yMax_lookup,
-        by = "Facet_col"
-      ) %>%
+      dplyr::left_join(yMax_lookup, by = "Facet_col") %>%
       dplyr::mutate(
-        yMax = yMax +
-          0.05 * yMax_bigger
+        yMax = yMax + 0.05 * (if (free_y) y_span else yMax_bigger)
       ) %>%
-      dplyr::select(
-        -yMax_bigger
-      )
+      dplyr::select(-yMax_bigger)
   }
   
   
   # ---- restore facet column name ----
   
   if (!is.null(Facet)) {
-    
     stat.test <- stat.test %>%
-      dplyr::rename(
-        !!Facet := Facet_col
-      )
+      dplyr::rename(!!Facet := Facet_col)
   }
   
   
   # ---- restore stat_group_by name ----
   
   if (!is.null(stat_group_by)) {
-    
     stat.test <- stat.test %>%
-      dplyr::rename(
-        !!stat_group_by :=
-          !!rlang::sym("stat_group_by")
-      )
+      dplyr::rename(!!stat_group_by := !!rlang::sym("stat_group_by"))
   }
   
   
   # ---- remove selected comparison ----
   
-  if (
-    !is.null(remove_comp_g1) &&
-    !is.null(remove_comp_g2)
-  ) {
-    
+  if (!is.null(remove_comp_g1) && !is.null(remove_comp_g2)) {
     stat.test <- stat.test %>%
-      dplyr::filter(
-        !(
-          group1 == remove_comp_g1 &
-            group2 == remove_comp_g2
-        )
-      )
+      dplyr::filter(!(group1 == remove_comp_g1 & group2 == remove_comp_g2))
   }
   
   
   # ---- add brackets / labels ----
   
-  if (
-    show_brackets &&
-    !is.null(stat.test) &&
-    nrow(stat.test) > 0
-  ) {
+  if (show_brackets && !is.null(stat.test) && nrow(stat.test) > 0) {
     
     if (is.null(bracket_dist)) {
       bracket_dist <- 0.05
     }
-    
     
     if (!is.null(Facet)) {
       
@@ -928,46 +606,20 @@ add_stat_test_dodge <- function(
         )
     }
     
-    
     stat.test <- stat.test %>%
-      dplyr::group_by(
-        dplyr::across(
-          dplyr::all_of(Facet)
-        )
-      ) %>%
+      dplyr::group_by(dplyr::across(dplyr::all_of(Facet))) %>%
       dplyr::mutate(
-        comp_rank = rank(
-          yMax,
-          ties.method = "first"
-        ),
-        
-        y_bracket =
-          yMax +
-          (
-            comp_rank - 1
-          ) *
-          bracket_dist *
-          bracket_y_range,
-        
-        yMax =
-          y_bracket +
-          0.01 * bracket_y_range
+        comp_rank = rank(yMax, ties.method = "first"),
+        y_bracket = yMax + (comp_rank - 1) * bracket_dist * bracket_y_range,
+        yMax = y_bracket + 0.01 * bracket_y_range
       ) %>%
       dplyr::ungroup() %>%
-      dplyr::select(
-        -bracket_y_range
-      )
-    
+      dplyr::select(-bracket_y_range)
     
     Plot_out <- plot +
       ggplot2::geom_segment(
         data = stat.test,
-        ggplot2::aes(
-          x = xmin,
-          xend = xmax,
-          y = y_bracket,
-          yend = y_bracket
-        ),
+        ggplot2::aes(x = xmin, xend = xmax, y = y_bracket, yend = y_bracket),
         inherit.aes = FALSE
       ) +
       ggpubr::stat_pvalue_manual(
@@ -983,27 +635,10 @@ add_stat_test_dodge <- function(
         inherit.aes = FALSE
       )
     
-    
   } else {
     
-    linetype_val <- if (
-      !is.null(Dodge) &&
-      is.null(stat_group_by)
-    ) {
-      "solid"
-    } else {
-      "blank"
-    }
-    
-    
-    tip_length_val <- if (
-      linetype_val == "solid"
-    ) {
-      0.05
-    } else {
-      0
-    }
-    
+    linetype_val <- if (!is.null(Dodge) && is.null(stat_group_by)) "solid" else "blank"
+    tip_length_val <- if (linetype_val == "solid") 0.05 else 0
     
     Plot_out <- plot +
       ggpubr::stat_pvalue_manual(
@@ -1024,50 +659,23 @@ add_stat_test_dodge <- function(
   # ---- axis expansion ----
   
   y_expand_mult <- dplyr::case_when(
-    !is.null(Dodge) &&
-      !is.null(Facet) ~ 0.30,
-    
-    !is.null(Dodge) &&
-      is.null(Facet) ~ 0.40,
-    
-    is.null(Dodge) &&
-      !is.null(Facet) ~ 0.25,
-    
+    !is.null(Dodge) && !is.null(Facet) ~ 0.30,
+    !is.null(Dodge) &&  is.null(Facet) ~ 0.40,
+    is.null(Dodge) && !is.null(Facet) ~ 0.25,
     TRUE ~ 0.20
   )
   
+  x_scale <- Plot_out$scales$get_scales("x")
   
-  x_scale <- Plot_out$scales$get_scales(
-    "x"
-  )
-  
-  
-  if (
-    !is.null(x_scale) &&
-    !is.null(x_padding)
-  ) {
-    
-    x_scale$expand <- ggplot2::expansion(
-      add = c(
-        x_padding,
-        x_padding
-      )
-    )
+  if (!is.null(x_scale) && !is.null(x_padding)) {
+    x_scale$expand <- ggplot2::expansion(add = c(x_padding, x_padding))
   }
   
-  
+  # lower_ylimit = NA -> limits c(NA, NA): no clipping, negative values kept
   Plot_out <- Plot_out +
     ggplot2::scale_y_continuous(
-      limits = c(
-        lower_ylimit,
-        NA
-      ),
-      expand = ggplot2::expansion(
-        mult = c(
-          expand_lower_y_mult,
-          y_expand_mult
-        )
-      )
+      limits = c(lower_ylimit, NA),
+      expand = ggplot2::expansion(mult = c(expand_lower_y_mult, y_expand_mult))
     )
   
   

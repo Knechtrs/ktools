@@ -82,7 +82,7 @@ maxwell_fitting_function <- function(
           ),
           data = df,
           start = start_values,
-          lower = c(0, 0, 0, 0),
+          lower = c(1, 1, 0, 0),
           upper = c(Inf, Inf, 1, 1),
           control = nls.lm.control(maxiter = 1000)
         )
