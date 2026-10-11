@@ -1,0 +1,12 @@
+Plotting_Percentage_Gel_Marker <- function(seurat_obj) {  
+    seurat_obj@meta.data %>%
+    mutate(binary_groups_Marker = recode(binary_groups_Marker, "0"="CD14 low", "1"="CD14 high")) %>%
+    ggplot(aes(x =binary_groups_Marker)) +
+    geom_bar(aes(fill = gel), position = "fill") + 
+    facet_wrap(~ timepoint) +
+    scale_fill_manual(values= Color.Gels) +
+    scale_y_continuous(limits=c(0,1), expand=c(0,0)) +
+    theme_fontsize()+
+    theme_layout +
+    theme(legend.position ="bottom", legend.direction="horizontal", axis.title.x=element_blank(), legend.title=element_blank())
+    }

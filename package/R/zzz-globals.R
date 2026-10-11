@@ -1,0 +1,1 @@
+utils::globalVariables(c(".y_range", "bracket_y_range", "comp_rank", "data_input", "Dodge_col", "dodge_numeric", "Facet_col", "Group_col", "group1", "group2", "ID_Col", "p", "Statistic", "test_result", "Value", "Variable", "x_dodge", "xmax", "xmin", "y_bracket", "y_max", "y.position", "yData_col", "yMax", "yMax_bigger"))

@@ -1,0 +1,13 @@
+Package: ktools
+Title: Shared Laboratory Analysis and Plotting Helpers
+Version: 0.1.0
+Authors@R: person("Raphael", "Knecht", email = "210419157+Knechtrs@users.noreply.github.com", role = c("aut", "cre"))
+Description: Versioned helpers for summary tables, statistical annotations,
+    plotting and themes, with a snapshot of legacy analysis scripts.
+License: file LICENSE
+Encoding: UTF-8
+Depends: R (>= 4.6.0)
+Imports: coin, dplyr, effectsize, flextable, ggplot2, ggpubr, grDevices, grid,
+    here, pals, purrr, RColorBrewer, rlang, rstatix, stats, svglite, tidyr,
+    tibble, tools, utils, yaml
+URL: https://github.com/Knechtrs/ktools

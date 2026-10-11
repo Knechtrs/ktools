@@ -1,0 +1,18 @@
+library(ktools)
+stopifnot(identical(format_pvalue_star(c(0.00001, 0.01, 0.8)), c("****", "*", "ns")))
+data <- data.frame(group = rep(c("A", "B"), each = 5), id = rep(1:5, 2), value = c(1:5, 4:8))
+summary <- create_summary_table(data, "value", "group")
+stopifnot(nrow(summary) == 2L, all(summary$Mean == c(3, 6)))
+plot <- plot_summary_points(data, xvar = "group", yvar = "value")
+plot_se_data <- ggplot2::ggplot_build(plot)$data[[2L]]
+plot_sd <- plot_summary_points(data, xvar = "group", yvar = "value", error_type = "sd")
+plot_sd_data <- ggplot2::ggplot_build(plot_sd)$data[[2L]]
+stopifnot(!isTRUE(all.equal(plot_se_data$ymax, plot_sd_data$ymax)))
+paired <- plot_paired_points(data, xvar = "group", yvar = "value", connectVar1 = "id")
+invisible(ggplot2::ggplot_build(paired))
+annotated <- add_stat_test_dodge(plot, yData = "value", Group = "group")
+stopifnot(is.list(annotated), "Plot" %in% names(annotated))
+invisible(ggplot2::ggplot_build(annotated$Plot))
+stopifnot(inherits(theme_layout + theme_fontsize(7, "Arial"), "theme"))
+stopifnot(file.exists(legacy_file("bose_analysis/read_units.R")))
+stopifnot(inherits(try(legacy_file("../DESCRIPTION"), silent = TRUE), "try-error"))
