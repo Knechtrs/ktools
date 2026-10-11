@@ -92,7 +92,7 @@ maxwell_fitting_function_general <- function(
     }
     
     if (!is.null(best_fit)) {
-      params <- coef(fit)
+      params <- coef(best_fit)
       residuals <- df[[fit_var]] - predict(best_fit)
       df_predict <- tibble(!!time := df[[time]], !!fit_var := predict(best_fit))
       df_residuals <- tibble(!!time := df[[time]], residuals = residuals)
