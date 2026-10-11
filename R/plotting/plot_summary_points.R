@@ -101,13 +101,16 @@ plot_summary_points <- function(
       plot.title = element_text(hjust = 0.5)
     )
   
+  # add to the function arguments:
+  #   error_type = c("se", "sd")
+  
   error_type <- match.arg(error_type)
   error_fun <- switch(
     error_type,
     se = mean_se,
     sd = function(x) mean_sdl(x, mult = 1)
   )
-
+  
   if (show_stat_summary) {
     p <- p +
       stat_summary(

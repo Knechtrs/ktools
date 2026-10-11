@@ -2,7 +2,7 @@
 
 
 # # load Plotting_Expression function first
-# source('Plotting_Expression.r')
+# source('/data/cephfs-1/work/groups/duda/users/knechtrs_c/Projects/Functions/Plotting/Plotting_Expression.r')
 
 # # create function to get markers and plot plots: 
 # GetMarker_Plotting <- function(Seurat_obj, GeneNames) {  
