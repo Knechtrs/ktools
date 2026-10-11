@@ -1,0 +1,11 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it using the metadata below."
+title: "ktools: Shared Laboratory Analysis and Plotting Helpers"
+version: 0.1.1
+date-released: 2026-10-11
+license: MIT
+repository-code: "https://github.com/Knechtrs/ktools"
+authors:
+  - family-names: Knecht
+    given-names: Raphael S.
+    orcid: "https://orcid.org/0000-0002-4434-8442"
